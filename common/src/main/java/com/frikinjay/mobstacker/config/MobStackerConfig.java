@@ -22,6 +22,13 @@ public class MobStackerConfig {
     private boolean consumeSeparator = true;
     private String separatorItem = "minecraft:diamond";
 
+    private boolean stackOutgoingDamage = false;
+
+    private int killBatchSize = 1;
+    private int breedBatchSize = 1;
+    private int shearBatchSize = 1;
+    private int breedCooldown = 6000;
+
     private List<String> ignoredEntities = new ArrayList<>(Arrays.asList(
             "minecraft:ender_dragon",
             "minecraft:vex"
@@ -83,6 +90,38 @@ public class MobStackerConfig {
 
     public void setStackRadius(double stackRadius) {
         this.stackRadius = Math.min(stackRadius, MAX_RADIUS);
+        save();
+    }
+
+    public boolean getStackOutgoingDamage() { return stackOutgoingDamage; }
+
+    public void setStackOutgoingDamage(boolean stackOutgoingDamage) {
+        this.stackOutgoingDamage = stackOutgoingDamage;
+        save();
+    }
+
+    public int getKillBatchSize() { return killBatchSize; }
+    public int getBreedBatchSize() { return breedBatchSize; }
+    public int getShearBatchSize() { return shearBatchSize; }
+    public int getBreedCooldown() { return breedCooldown; }
+
+    public void setKillBatchSize(int killBatchSize) {
+        this.killBatchSize = Math.max(1, killBatchSize);
+        save();
+    }
+
+    public void setBreedBatchSize(int breedBatchSize) {
+        this.breedBatchSize = Math.max(1, breedBatchSize);
+        save();
+    }
+
+    public void setShearBatchSize(int shearBatchSize) {
+        this.shearBatchSize = Math.max(1, shearBatchSize);
+        save();
+    }
+
+    public void setBreedCooldown(int breedCooldown) {
+        this.breedCooldown = Math.max(0, breedCooldown);
         save();
     }
 

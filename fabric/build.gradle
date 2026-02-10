@@ -1,4 +1,4 @@
-plugins {
+ plugins {
     id 'com.github.johnrengelman.shadow'
 }
 
@@ -6,6 +6,13 @@ architectury {
     platformSetupLoomIde()
     fabric()
 }
+
+ loom {
+     mixin {
+         useLegacyMixinAp = true
+         defaultRefmapName = "mobstacker-fabric.refmap.json"
+     }
+ }
 
 configurations {
     common {

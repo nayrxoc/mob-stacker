@@ -1,7 +1,9 @@
 package com.frikinjay.mobstacker;
 
-import net.minecraft.nbt.CompoundTag;
-
 public interface ICustomDataHolder {
-    CompoundTag mobstacker$getCustomData();
+    int mobstacker$getStackSize();
+    void mobstacker$setStackSize(int size);
+
+    boolean mobstacker$getCanStack();
+    void mobstacker$setCanStack(boolean canStack);
 }

@@ -24,7 +24,7 @@ public class EntityMixin {
     @Inject(method = "setCustomName", at = @At("TAIL"))
     private void mobstacker$onSetCustomName(@Nullable Component component, CallbackInfo ci) {
         Entity self = (Entity) (Object) this;
-        if (!self.level().isClientSide && self instanceof Mob) {
+        if (!self.level().isClientSide() && self instanceof Mob) {
             Component customName = self.getCustomName();
 
             if (customName != null) {
