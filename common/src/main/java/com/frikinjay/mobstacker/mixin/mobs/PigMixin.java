@@ -16,7 +16,8 @@ public class PigMixin {
 
     @Inject(method = "thunderHit",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/monster/ZombifiedPiglin;setPersistenceRequired()V"),
-            locals = LocalCapture.CAPTURE_FAILSOFT)
+            locals = LocalCapture.CAPTURE_FAILSOFT,
+            require = 0)
     private void mobstacker$thunderHit(ServerLevel serverLevel, LightningBolt lightningBolt, CallbackInfo ci, ZombifiedPiglin zombifiedPiglin) {
         if (zombifiedPiglin != null) {
             Pig instance = (Pig) (Object) this;
@@ -25,5 +26,4 @@ public class PigMixin {
             MobStacker.updateStackDisplay(zombifiedPiglin);
         }
     }
-
 }
