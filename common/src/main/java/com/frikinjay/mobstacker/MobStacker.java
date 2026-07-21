@@ -4,26 +4,36 @@ import com.frikinjay.almanac.Almanac;
 import com.frikinjay.mobstacker.api.MobStackerAPI;
 import com.frikinjay.mobstacker.command.MobStackerCommands;
 import com.frikinjay.mobstacker.config.MobStackerConfig;
+import com.frikinjay.mobstacker.mixin.mobs.AxolotlMixin;
+import com.frikinjay.mobstacker.mixin.mobs.CatMixin;
+import com.frikinjay.mobstacker.mixin.mobs.FoxMixin;
+import com.frikinjay.mobstacker.mixin.mobs.FrogMixin;
+import com.frikinjay.mobstacker.mixin.mobs.MushroomCowMixin;
+import com.frikinjay.mobstacker.mixin.mobs.WolfMixin;
 import com.mojang.logging.LogUtils;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.ProblemReporter;
+import net.minecraft.world.level.storage.TagValueInput;
+import net.minecraft.world.level.storage.TagValueOutput;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.animal.Cat;
-import net.minecraft.world.entity.animal.Fox;
-import net.minecraft.world.entity.animal.MushroomCow;
-import net.minecraft.world.entity.animal.Sheep;
+import net.minecraft.world.entity.animal.feline.Cat;
+import net.minecraft.world.entity.animal.fox.Fox;
+import net.minecraft.world.entity.animal.cow.MushroomCow;
+import net.minecraft.world.entity.animal.sheep.Sheep;
 import net.minecraft.world.entity.animal.axolotl.Axolotl;
 import net.minecraft.world.entity.animal.frog.Frog;
 import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.animal.wolf.Wolf;
 import net.minecraft.world.entity.monster.Slime;
-import net.minecraft.world.entity.monster.ZombieVillager;
-import net.minecraft.world.entity.npc.Villager;
-import net.minecraft.world.entity.npc.VillagerProfession;
+import net.minecraft.world.entity.monster.zombie.ZombieVillager;
+import net.minecraft.world.entity.npc.villager.Villager;
+import net.minecraft.world.entity.npc.villager.VillagerProfession;
 import org.slf4j.Logger;
 
 import java.io.File;
@@ -58,7 +68,8 @@ public final class MobStacker {
             Axolotl.class, (self, other) -> ((Axolotl)self).getVariant() == ((Axolotl)other).getVariant(),
             Cat.class, (self, other) -> ((Cat)self).getVariant() == ((Cat)other).getVariant(),
             Fox.class, (self, other) -> ((Fox)self).getVariant() == ((Fox)other).getVariant(),
-            MushroomCow.class, (self, other) -> ((MushroomCow)self).getVariant() == ((MushroomCow)other).getVariant()
+            MushroomCow.class, (self, other) -> ((MushroomCow)self).getVariant() == ((MushroomCow)other).getVariant(),
+            Wolf.class, (self, other) -> checkWolfMatch((Wolf)self, (Wolf)other)
     );
 
     public static void init() {
@@ -76,7 +87,11 @@ public final class MobStacker {
             return false;
         }
 
-        ResourceLocation entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
+        if (entity instanceof Wolf wolf && wolf.isTame()) {
+            return false;
+        }
+
+        Identifier entityId = BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType());
         if (config.getIgnoredEntities().contains(entityId.toString()) ||
                 config.getIgnoredMods().contains(entityId.getNamespace())) {
             return false;
@@ -103,20 +118,25 @@ public final class MobStacker {
     }
 
     private static boolean checkVillagerMatch(Villager self, Villager other) {
-        return self.getVariant() == other.getVariant()
-                && self.getVillagerData().getProfession() == VillagerProfession.NONE
-                && other.getVillagerData().getProfession() == VillagerProfession.NONE;
+        return self.getVillagerData().type() == other.getVillagerData().type()
+                && self.getVillagerData().profession().is(VillagerProfession.NONE)
+                && other.getVillagerData().profession().is(VillagerProfession.NONE);
     }
 
     private static boolean checkZombieVillagerMatch(ZombieVillager self, ZombieVillager other) {
-        return self.getVariant() == other.getVariant()
-                && self.getVillagerData().getProfession() == VillagerProfession.NONE
-                && other.getVillagerData().getProfession() == VillagerProfession.NONE;
+        return self.getVillagerData().type() == other.getVillagerData().type()
+                && self.getVillagerData().profession().is(VillagerProfession.NONE)
+                && other.getVillagerData().profession().is(VillagerProfession.NONE);
+    }
+
+    private static boolean checkWolfMatch(Wolf self, Wolf other) {
+        if (self.isTame() || other.isTame()) return false;
+        return ((WolfMixin) self).mobstacker$getVariant() == ((WolfMixin) other).mobstacker$getVariant();
     }
 
     public static void spawnNewEntity(ServerLevel serverLevel, Mob self, int stackSize) {
         EntityType<?> entityType = self.getType();
-        Mob newEntity = (Mob) entityType.create(serverLevel);
+        Mob newEntity = (Mob) entityType.create(serverLevel, EntitySpawnReason.NATURAL);
         if (newEntity == null) return;
 
         copyEntityData(self, newEntity, serverLevel);
@@ -126,9 +146,12 @@ public final class MobStacker {
 
     private static void copyEntityData(Mob source, Mob target, ServerLevel serverLevel) {
         target.finalizeSpawn(serverLevel, serverLevel.getCurrentDifficultyAt(source.blockPosition()),
-                MobSpawnType.NATURAL, null);
-        target.moveTo(source.position().x, source.position().y, source.position().z,
-                source.getYRot(), source.getXRot());
+                EntitySpawnReason.NATURAL, null);
+//        target.moveTo(source.position().x, source.position().y, source.position().z,
+//                source.getYRot(), source.getXRot());
+        target.setPos(source.position());
+        target.setYRot(source.getYRot());
+        target.setXRot(source.getXRot());
         target.yBodyRot = source.yBodyRot;
 
         if (source.hasCustomName()) {
@@ -145,22 +168,22 @@ public final class MobStacker {
             targetSheep.setColor(sourceSheep.getColor());
         } else if (source instanceof Villager sourceVillager && target instanceof Villager targetVillager) {
             targetVillager.setVillagerData(sourceVillager.getVillagerData());
-            targetVillager.setVariant(sourceVillager.getVariant());
         } else if (source instanceof ZombieVillager sourceZombie && target instanceof ZombieVillager targetZombie) {
             targetZombie.setVillagerData(sourceZombie.getVillagerData());
-            targetZombie.setVariant(sourceZombie.getVariant());
         } else if (source instanceof Slime sourceSlime && target instanceof Slime targetSlime) {
             targetSlime.setSize(sourceSlime.getSize(), true);
         } else if (source instanceof Frog sourceFrog && target instanceof Frog targetFrog) {
-            targetFrog.setVariant(sourceFrog.getVariant());
+            ((FrogMixin) targetFrog).mobstacker$setVariant(sourceFrog.getVariant());
         } else if (source instanceof Axolotl sourceAxolotl && target instanceof Axolotl targetAxolotl) {
-            targetAxolotl.setVariant(sourceAxolotl.getVariant());
+            ((AxolotlMixin) targetAxolotl).mobstacker$setVariant(sourceAxolotl.getVariant());
         } else if (source instanceof Cat sourceCat && target instanceof Cat targetCat) {
-            targetCat.setVariant(sourceCat.getVariant());
+            ((CatMixin) targetCat).mobstacker$setVariant(sourceCat.getVariant());
         } else if (source instanceof Fox sourceFox && target instanceof Fox targetFox) {
-            targetFox.setVariant(sourceFox.getVariant());
+            ((FoxMixin) targetFox).mobstacker$setVariant(sourceFox.getVariant());
         } else if (source instanceof MushroomCow sourceCow && target instanceof MushroomCow targetCow) {
-            targetCow.setVariant(sourceCow.getVariant());
+            ((MushroomCowMixin) targetCow).mobstacker$setVariant(sourceCow.getVariant());
+        } else if (source instanceof Wolf sourceWolf && target instanceof Wolf targetWolf) {
+            ((WolfMixin) targetWolf).mobstacker$setVariant(((WolfMixin) sourceWolf).mobstacker$getVariant());
         }
     }
 
@@ -170,8 +193,12 @@ public final class MobStacker {
         try {
             ServerLevel serverLevel = (ServerLevel) entity.level();
             EntityType<?> entityType = entity.getType();
-            Mob newEntity = (Mob) entityType.create(entity.level());
+//            Mob newEntity = (Mob) entityType.create(entity.level());
+            Mob newEntity = (Mob) entityType.create(entity.level(), EntitySpawnReason.NATURAL);
             if (newEntity == null) return;
+            newEntity.setPos(entity.position());
+            newEntity.setYRot(entity.getYRot());
+            newEntity.setXRot(entity.getXRot());
 
             setStackSize(entity, getStackSize(entity) - 1);
 
@@ -190,9 +217,13 @@ public final class MobStacker {
 
     private static void copyEntityDataForSeparation(Mob source, Mob target, ServerLevel serverLevel) {
         target.finalizeSpawn(serverLevel, serverLevel.getCurrentDifficultyAt(source.blockPosition()),
-                MobSpawnType.NATURAL, null);
-        target.moveTo(source.position().x, source.position().y, source.position().z,
-                source.getYRot(), source.getXRot());
+                EntitySpawnReason.NATURAL, null);
+//        target.moveTo(source.position().x, source.position().y, source.position().z,
+//                source.getYRot(), source.getXRot());
+//        target.yBodyRot = source.yBodyRot;
+        target.setPos(source.position());
+        target.setYRot(source.getYRot());
+        target.setXRot(source.getXRot());
         target.yBodyRot = source.yBodyRot;
 
         Component newName = Component.literal("Lone " + Almanac.getLocalizedEntityName(source.getType()).getString());
@@ -210,8 +241,7 @@ public final class MobStacker {
     public static void mergeEntities(Mob target, Mob source) {
         int newStackSize = Math.min(getStackSize(target) + getStackSize(source), getMaxMobStackSize());
 
-        CompoundTag targetNbt = new CompoundTag();
-        target.saveWithoutId(targetNbt);
+        CompoundTag targetNbt = saveEntityToNbt(target);
 
         Almanac.dropEquipmentOnDiscard(source);
         Almanac.dropEquipmentOnDiscard(target);
@@ -220,7 +250,7 @@ public final class MobStacker {
 
         updateStackDataInNbt(targetNbt, newStackSize);
 
-        target.load(targetNbt);
+        loadEntityFromNbt(target, targetNbt);
 
         updateHealth(target, source);
 
@@ -229,13 +259,23 @@ public final class MobStacker {
         updateStackDisplay(target);
     }
 
-    private static void copyRelevantNbtData(Mob source, CompoundTag targetNbt) {
-        CompoundTag sourceNbt = new CompoundTag();
-        source.saveWithoutId(sourceNbt);
+    private static CompoundTag saveEntityToNbt(Entity entity) {
+        TagValueOutput output = TagValueOutput.createWithContext(ProblemReporter.DISCARDING, entity.registryAccess());
+        entity.saveWithoutId(output);
+        return output.buildResult();
+    }
 
-        sourceNbt.getAllKeys().stream()
-                .filter(key -> !isExcludedNbtKey(key))
-                .forEach(key -> targetNbt.put(key, sourceNbt.get(key)));
+    private static void loadEntityFromNbt(Entity entity, CompoundTag nbt) {
+        entity.load(TagValueInput.create(ProblemReporter.DISCARDING, entity.registryAccess(), nbt));
+    }
+
+    private static void copyRelevantNbtData(Mob source, CompoundTag targetNbt) {
+        CompoundTag sourceNbt = saveEntityToNbt(source);
+
+//        sourceNbt.getAllKeys().stream()
+//                .filter(key -> !isExcludedNbtKey(key))
+//                .forEach(key -> targetNbt.put(key, sourceNbt.get(key)));
+        sourceNbt.keySet().forEach(key -> targetNbt.put(key, sourceNbt.get(key)));
     }
 
     private static boolean isExcludedNbtKey(String key) {
@@ -244,8 +284,9 @@ public final class MobStacker {
     }
 
     private static void updateStackDataInNbt(CompoundTag nbt, int stackSize) {
-        CompoundTag stackData = nbt.contains(STACK_DATA_KEY, 10) ?
-                nbt.getCompound(STACK_DATA_KEY) : new CompoundTag();
+//        CompoundTag stackData = nbt.contains(STACK_DATA_KEY, 10) ?
+//                nbt.getCompound(STACK_DATA_KEY) : new CompoundTag();
+        CompoundTag stackData = nbt.getCompoundOrEmpty(STACK_DATA_KEY);
         stackData.putInt(STACK_SIZE_KEY, stackSize);
         nbt.put(STACK_DATA_KEY, stackData);
     }
@@ -381,33 +422,32 @@ public final class MobStacker {
     }
 
     public static int getStackSize(Mob entity) {
-        if (!(entity instanceof ICustomDataHolder holder)) {
-            return 1;
+        if (entity instanceof ICustomDataHolder holder) {
+            return holder.mobstacker$getStackSize();
         }
-        CompoundTag customData = holder.mobstacker$getCustomData();
-        return customData.contains(STACK_SIZE_KEY) ? customData.getInt(STACK_SIZE_KEY) : 1;
+        return 1;
     }
 
     public static void setStackSize(Mob entity, int size) {
         if (entity instanceof ICustomDataHolder holder) {
-            holder.mobstacker$getCustomData().putInt(STACK_SIZE_KEY, size);
+            holder.mobstacker$setStackSize(size);
             updateStackDisplay(entity);
         }
     }
 
     public static boolean getCanStack(Mob entity) {
-        if (!(entity instanceof ICustomDataHolder holder)) {
-            return true;
+        if (entity instanceof ICustomDataHolder holder) {
+            return holder.mobstacker$getCanStack();
         }
-        CompoundTag customData = holder.mobstacker$getCustomData();
-        return !customData.contains(CAN_STACK_KEY) || customData.getBoolean(CAN_STACK_KEY);
+        return true;
     }
 
     public static void setCanStack(Mob entity, boolean canStack) {
         if (entity instanceof ICustomDataHolder holder) {
-            holder.mobstacker$getCustomData().putBoolean(CAN_STACK_KEY, canStack);
+            holder.mobstacker$setCanStack(canStack);
         }
     }
+
 
     public static double getStackRadius() {return config.getStackRadius();}
 
@@ -422,6 +462,13 @@ public final class MobStacker {
     public static boolean getConsumeSeparator() {return config.getConsumeSeparator();}
 
     public static String getSeparatorItem() {return config.getSeparatorItem();}
+
+    public static boolean getStackOutgoingDamage() {return config.getStackOutgoingDamage();}
+
+    public static int getKillBatchSize() {return config.getKillBatchSize();}
+    public static int getBreedBatchSize() {return config.getBreedBatchSize();}
+    public static int getShearBatchSize() {return config.getShearBatchSize();}
+    public static int getBreedCooldown() {return config.getBreedCooldown();}
 
     public static int getMonsterMobCap() {return config.getMonsterMobCap();}
     public static int getCreatureMobCap() {return config.getCreatureMobCap();}

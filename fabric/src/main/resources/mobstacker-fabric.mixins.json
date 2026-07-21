@@ -3,10 +3,11 @@
   "package": "com.frikinjay.mobstacker.fabric.mixin",
   "compatibilityLevel": "JAVA_21",
   "minVersion": "0.8",
+  "refmap": "mobstacker-fabric.refmap.json",
   "client": [
   ],
   "mixins": [
-    "mobs.MushroomCowMixin",
+    "mobs.MushroomCowShearMixin",
     "mobs.SheepMixin"
   ],
   "injectors": {

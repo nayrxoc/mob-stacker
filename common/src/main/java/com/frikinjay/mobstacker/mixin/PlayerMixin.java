@@ -2,7 +2,7 @@ package com.frikinjay.mobstacker.mixin;
 
 import com.frikinjay.mobstacker.MobStacker;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
@@ -21,33 +21,37 @@ public class PlayerMixin {
 
     @Inject(method = "interactOn", at = @At("HEAD"))
     private void mobstacker$onInteract(Entity entity, InteractionHand interactionHand, CallbackInfoReturnable<InteractionResult> cir) {
-        if(MobStacker.getEnableSeparator() && entity instanceof Mob && !entity.level().isClientSide) {
+        if (MobStacker.getEnableSeparator() && entity instanceof Mob && !entity.level().isClientSide()) {
             Player player = (Player) (Object) this;
             int stackSize = MobStacker.getStackSize((Mob) entity);
             ItemStack itemStack = player.getItemInHand(interactionHand);
 
-            ResourceLocation separatorResourceLocation = mobstacker$getResourceLocation();
+            Identifier separatorResourceLocation = mobstacker$getResourceLocation();
 
-            if (stackSize > 1 && itemStack.is(BuiltInRegistries.ITEM.get(separatorResourceLocation))) {
-                MobStacker.separateEntity((Mob) entity);
-                if(!player.isCreative() && MobStacker.getConsumeSeparator()) {
-                    itemStack.setCount(itemStack.getCount() - 1);
-                }
+            if (stackSize > 1) {
+                BuiltInRegistries.ITEM.get(separatorResourceLocation).ifPresent(holder -> {
+                    if (itemStack.is(holder)) {
+                        MobStacker.separateEntity((Mob) entity);
+                        if (!player.isCreative() && MobStacker.getConsumeSeparator()) {
+                            itemStack.setCount(itemStack.getCount() - 1);
+                        }
+                    }
+                });
             }
         }
     }
 
+
     @Unique
-    private static @NotNull ResourceLocation mobstacker$getResourceLocation() {
+    private static @NotNull Identifier mobstacker$getResourceLocation() {
         String separatorItemId = MobStacker.getSeparatorItem();
         String[] parts = separatorItemId.split(":", 2);
-        ResourceLocation separatorResourceLocation;
+        Identifier separatorResourceLocation;
 
         if (parts.length == 2) {
-            separatorResourceLocation = new ResourceLocation(parts[0], parts[1]);
+            separatorResourceLocation = Identifier.fromNamespaceAndPath(parts[0], parts[1]);
         } else {
-            // Fallback to "minecraft" namespace if no colon is present
-            separatorResourceLocation = new ResourceLocation("minecraft", separatorItemId);
+            separatorResourceLocation = Identifier.withDefaultNamespace(separatorItemId);
         }
         return separatorResourceLocation;
     }

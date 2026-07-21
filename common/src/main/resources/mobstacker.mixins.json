@@ -2,21 +2,28 @@
   "required": true,
   "package": "com.frikinjay.mobstacker.mixin",
   "compatibilityLevel": "JAVA_21",
+  "refmap": "mobstacker.refmap.json",
   "minVersion": "0.8",
   "client": [
   ],
   "mixins": [
+    "AnimalMixin",
     "EntityDataMixin",
     "EntityMixin",
     "LivingEntityCustomNameMixin",
     "LivingEntityMixin",
+    "MobAttackMixin",
     "MobCategoryMixin",
     "MobMixin",
     "PlayerMixin",
     "ServerEntityMixin",
-    "mobs.PigMixin",
-    "mobs.VillagerMixin",
-    "mobs.ZombieMixin"
+    "mobs.AxolotlMixin",
+    "mobs.CatMixin",
+    "mobs.FoxMixin",
+    "mobs.FrogMixin",
+    "mobs.MushroomCowMixin",
+    "mobs.WolfMixin",
+    "mobs.WolfTamingMixin"
   ],
   "injectors": {
     "defaultRequire": 1
